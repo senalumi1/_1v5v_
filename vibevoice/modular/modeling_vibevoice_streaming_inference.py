@@ -2,6 +2,10 @@ from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple, Union, Callable
 from tqdm import tqdm
 import torch
+torch.backends.cuda.enable_flash_sdp(False)
+torch.backends.cuda.enable_mem_efficient_sdp(False)
+torch.backends.cuda.enable_math_sdp(True)
+
 import torch.nn as nn
 
 from transformers.models.auto import AutoModel, AutoModelForCausalLM
@@ -20,10 +24,6 @@ from .configuration_vibevoice_streaming import VibeVoiceStreamingConfig
 from .modular_vibevoice_text_tokenizer import VibeVoiceTextTokenizer, VibeVoiceTextTokenizerFast
 from .modeling_vibevoice_streaming import VibeVoiceStreamingPreTrainedModel, VibeVoiceStreamingModel, BinaryClassifier
 from .streamer import AudioStreamer, AsyncAudioStreamer
-import torch
-torch.backends.cuda.enable_flash_sdp(False)
-torch.backends.cuda.enable_mem_efficient_sdp(False)
-torch.backends.cuda.enable_math_sdp(True)
     
 logger = logging.get_logger(__name__)
 
