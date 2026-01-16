@@ -572,8 +572,8 @@ class VibeVoiceStreamingForConditionalGenerationInference(VibeVoiceStreamingPreT
             if len(diffusion_indices) == 0:
                 break
             for cur_speech_index in range(TTS_SPEECH_WINDOW_SIZE):
-                positive_condition = tts_lm_outputs.last_hidden_state[diffusion_indices, -1, :]
-                negative_condition = tts_lm_negative_outputs.last_hidden_state[diffusion_indices, -1, :]
+                positive_condition = tts_lm_outputs.last_hidden_state.index_select(0, diffusion_indices)[:, -1, :]
+                negative_condition = tts_lm_negative_outputs.last_hidden_state.index_select(0, diffusion_indices)[:, -1, :]
                 
                 speech_latent = self.sample_speech_tokens(
                     positive_condition,
@@ -713,24 +713,33 @@ class VibeVoiceStreamingForConditionalGenerationInference(VibeVoiceStreamingPreT
             dtype=dtype,   # 🔑 float32 금지
         )
 
+        B = condition.shape[0] // 2
+        assert condition.shape[0] % 2 == 0
+
+        condition = condition.to(device=device, dtype=dtype)
+        speech = speech.to(device=device, dtype=dtype)
+
         for t in self.model.noise_scheduler.timesteps:
             t = t.to(device)
-            half = speech[: len(speech) // 2]
-            combined = torch.cat([half, half], dim=0).to(device=device, dtype=dtype)
+            half = speech[:B]
+            combined = torch.cat([half, half], dim=0)
+
+            t_batch = t.expand(2 * B)
 
             eps = head(
                 combined,
-                t.repeat(combined.shape[0]),
+                t_batch,
                 condition=condition,
             )
 
-            cond_eps, uncond_eps = torch.split(eps, len(eps) // 2, dim=0)
+            cond_eps, uncond_eps = eps[:B], eps[B:]
             half_eps = uncond_eps + cfg_scale * (cond_eps - uncond_eps)
             eps = torch.cat([half_eps, half_eps], dim=0)
 
             speech = self.model.noise_scheduler.step(eps, t, speech).prev_sample
 
-        return speech[: len(speech) // 2]
+        return speech[:B]
+
 
 
 AutoModelForCausalLM.register(VibeVoiceStreamingConfig, VibeVoiceStreamingForConditionalGenerationInference)
