@@ -49,7 +49,7 @@ def _update_model_kwargs_for_generation(
     """
 
     # update past_key_values keeping its naming used in model code
-    model_kwargs["past_key_values"] = getattr(outputs, "past_key_values")
+  
 
     attention_mask = model_kwargs["attention_mask"]
     model_kwargs["attention_mask"] = torch.cat(
@@ -162,6 +162,7 @@ class VibeVoiceStreamingForConditionalGenerationInference(VibeVoiceStreamingPreT
         self.ddpm_inference_steps = num_steps or self.config.diffusion_head_config.ddpm_num_inference_steps
 
     # @can_return_tuple
+    
     def forward_lm(
         self,
         input_ids: torch.LongTensor = None,
@@ -196,14 +197,14 @@ class VibeVoiceStreamingForConditionalGenerationInference(VibeVoiceStreamingPreT
             inputs_embeds=inputs_embeds,
             attention_mask=attention_mask,
             position_ids=position_ids,
-            past_key_values=None,   # 이중 안전
-            use_cache=use_cache,
+            past_key_values=None,
+            use_cache=False,                 # ← 고정
             output_attentions=output_attentions,
             output_hidden_states=output_hidden_states,
             return_dict=return_dict,
-            cache_position=cache_position,
-            **kwargs,
+            attn_implementation="eager",     # ← 추가
         )
+
 
         hidden_states = outputs[0] if not return_dict else outputs.last_hidden_state
 
@@ -234,26 +235,7 @@ class VibeVoiceStreamingForConditionalGenerationInference(VibeVoiceStreamingPreT
         tts_text_masks: Optional[torch.BoolTensor] = None,
         **kwargs,
     ) -> Union[Tuple, VibeVoiceCausalLMOutputWithPast]:
-        """
-        Single pass of the TTS LM.
-
-        - Overwrites tail embeddings with `lm_last_hidden_state`.
-        - Adds type embedding via `tts_text_masks` (1=text, 0=speech).
-        - Predicts EOS from last hidden state (binary classifier).
-        - No loss / no full acoustic decoding here.
-
-        Args:
-            input_ids: (B, S) token ids.
-            attention_mask: (B, S) mask.
-            lm_last_hidden_state: (B, K, H) hidden states to splice into the tail.
-            tts_text_masks: (B, 1) mask marking current position as text(1)/speech(0).
-            past_key_values: cache from previous TTS steps.
-            cache_position: positions for cached tokens.
-            labels: unsupported (will raise).
-
-        Returns:
-            VibeVoiceCausalLMOutputWithPast with `logits` (EOS), `last_hidden_state`, `past_key_values`.
-        """
+    
         return_dict = return_dict if return_dict is not None else self.config.use_return_dict
         
         # Get embeddings
