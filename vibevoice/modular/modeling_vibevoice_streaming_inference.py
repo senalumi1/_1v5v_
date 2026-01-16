@@ -177,29 +177,24 @@ class VibeVoiceStreamingForConditionalGenerationInference(VibeVoiceStreamingPreT
         cache_position: Optional[torch.LongTensor] = None,
         **kwargs,
     ) -> Union[Tuple, BaseModelOutputWithPast]:
-        """
-        Single pass of the base text LM.
 
-        - Builds embeddings if `inputs_embeds` not provided.
-        - Uses (and returns) `past_key_values` when `use_cache=True`.
-        - No loss / no lm_head / no speech logic.
-
-        Args:
-            input_ids: (B, S) token ids.
-            attention_mask: (B, S) mask.
-            past_key_values: cache from previous steps.
-            cache_position: positions for cached tokens.
-            labels: unsupported (will raise).
-
-        Returns:
-            BaseModelOutputWithPast with `last_hidden_state` and `past_key_values`.
-        """
         return_dict = return_dict if return_dict is not None else self.config.use_return_dict
-        
-        # Get embeddings
+
+        # 1) embeddings 생성
         if inputs_embeds is None:
             inputs_embeds = self.model.get_input_embeddings()(input_ids)
 
+        # 2) 🔒 attention 진입 전 dtype 강제 통일 (핵심)
+        if inputs_embeds is not None:
+            inputs_embeds = inputs_embeds.to(torch.float16)
+
+        if past_key_values is not None:
+            past_key_values = tuple(
+                tuple(p.to(torch.float16) if p is not None else None for p in layer)
+                for layer in past_key_values
+            )
+
+        # 3) LM forward
         outputs = self.model.language_model(
             inputs_embeds=inputs_embeds,
             attention_mask=attention_mask,
@@ -214,7 +209,7 @@ class VibeVoiceStreamingForConditionalGenerationInference(VibeVoiceStreamingPreT
         )
 
         hidden_states = outputs[0] if not return_dict else outputs.last_hidden_state
-                
+
         if labels is not None:
             raise NotImplementedError("Loss computation is not implemented in this version.")
 
