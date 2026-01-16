@@ -366,7 +366,7 @@ class VibeVoiceStreamingForConditionalGenerationInference(VibeVoiceStreamingPreT
         )
 
         max_cache_length = generation_config.max_length - 1
-        self._prepare_cache_for_generation(generation_config, model_kwargs, None, batch_size, max_cache_length)
+        self._prepare_cache_for_generation(generation_config, model_kwargs, None, batch_size, max_cache_length, self.device)
         model_kwargs['cache_position'] = torch.arange(input_ids_length, device=device, dtype=torch.long)
         for k, v in model_kwargs.items():
             if isinstance(v, torch.Tensor):
