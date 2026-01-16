@@ -24,7 +24,7 @@ from .configuration_vibevoice_streaming import VibeVoiceStreamingConfig
 from .modular_vibevoice_text_tokenizer import VibeVoiceTextTokenizer, VibeVoiceTextTokenizerFast
 from .modeling_vibevoice_streaming import VibeVoiceStreamingPreTrainedModel, VibeVoiceStreamingModel, BinaryClassifier
 from .streamer import AudioStreamer, AsyncAudioStreamer
-    
+
 logger = logging.get_logger(__name__)
 
 if not hasattr(modeling_utils, "ALL_PARALLEL_STYLES") or modeling_utils.ALL_PARALLEL_STYLES is None:
@@ -49,14 +49,16 @@ def _update_model_kwargs_for_generation(
     """
 
     # update past_key_values keeping its naming used in model code
-  
 
     attention_mask = model_kwargs["attention_mask"]
     model_kwargs["attention_mask"] = torch.cat(
         [attention_mask, attention_mask.new_ones((attention_mask.shape[0], num_new_tokens))], dim=-1
     )
 
-    model_kwargs["cache_position"] = torch.arange(model_kwargs["cache_position"][-1] + 1, model_kwargs["cache_position"][-1] + num_new_tokens + 1).to(model_kwargs["cache_position"].device)
+    model_kwargs["cache_position"] = torch.arange(
+        model_kwargs["cache_position"][-1] + 1,
+        model_kwargs["cache_position"][-1] + num_new_tokens + 1
+    ).to(model_kwargs["cache_position"].device)
     
     return model_kwargs
 
@@ -130,7 +132,7 @@ class VibeVoiceStreamingForConditionalGenerationInference(VibeVoiceStreamingPreT
         # Tie lm_head.weight to language_model.embed_tokens.weight
         if not getattr(self.config, 'tie_word_embeddings', False):
             return
-         
+            
         if hasattr(self, 'lm_head') and hasattr(self.model.language_model, 'embed_tokens'):
             self.lm_head.weight = self.model.language_model.embed_tokens.weight
         
@@ -204,7 +206,6 @@ class VibeVoiceStreamingForConditionalGenerationInference(VibeVoiceStreamingPreT
             return_dict=return_dict,
             attn_implementation="eager",     # ← 추가
         )
-
 
         hidden_states = outputs[0] if not return_dict else outputs.last_hidden_state
 
@@ -285,9 +286,9 @@ class VibeVoiceStreamingForConditionalGenerationInference(VibeVoiceStreamingPreT
           2. A monolithic call would hide required sequencing (prefill, window stepping, speech diffusion sampling).
 
         Use instead:
-          - self.forward_lm(...)       for a base text LM step (prefill or incremental).
-          - self.forward_tts_lm(...)   for a single TTS LM step (needs LM hidden states).
-          - self.generate(...)         for full streaming (text + speech + diffusion + audio assembly).
+          - self.forward_lm(...)        for a base text LM step (prefill or incremental).
+          - self.forward_tts_lm(...)    for a single TTS LM step (needs LM hidden states).
+          - self.generate(...)          for full streaming (text + speech + diffusion + audio assembly).
 
         Raises:
             RuntimeError: Always (by design).

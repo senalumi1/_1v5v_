@@ -39,7 +39,8 @@ class RMSNorm(nn.Module):
 
     def extra_repr(self) -> str:
         return f'dim={self.dim}, eps={self.eps}, elementwise_affine={self.elementwise_affine}'
-    
+
+
 def modulate(x, shift, scale):
     """Apply modulation to input tensor."""
     return x * (1 + scale) + shift
@@ -70,7 +71,7 @@ class TimestepEmbedder(nn.Module):
         
         Args:
             t (`torch.Tensor`): A 1-D Tensor of N indices, one per batch element.
-                            These may be fractional.
+                                These may be fractional.
             dim (`int`): The dimension of the output.
             max_period (`int`, optional): Controls the minimum frequency of the embeddings.
             
@@ -122,7 +123,7 @@ class FeedForwardNetwork(nn.Module):
         gate = self.act_fn(gate)
         return self.down_proj(gate * up)
 
-    
+
 class HeadLayer(nn.Module):
     """
     A layer in the diffusion head.
@@ -278,8 +279,6 @@ class VibeVoiceDiffusionHead(PreTrainedModel):
 
         x = self.final_layer(x, c)
         return x
-
-
 
 
 AutoModel.register(VibeVoiceDiffusionHeadConfig, VibeVoiceDiffusionHead)
