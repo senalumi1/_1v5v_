@@ -697,36 +697,30 @@ class VibeVoiceStreamingForConditionalGenerationInference(VibeVoiceStreamingPreT
 
     @torch.no_grad()
     def sample_speech_tokens(self, condition, neg_condition, cfg_scale=3.0):
+        head = self.model.prediction_head
+        device = head.noisy_images_proj.weight.device
+        dtype  = head.noisy_images_proj.weight.dtype  # 🔑 핵심
+
         self.model.noise_scheduler.set_timesteps(self.ddpm_inference_steps)
 
-        # 🔒 기준 dtype / device를 prediction_head에 맞춤
-        head = self.model.prediction_head
-        target_dtype = head.noisy_images_proj.weight.dtype
-        target_device = head.noisy_images_proj.weight.device
-
-        condition = torch.cat([condition, neg_condition], dim=0).to(
-            device=target_device, dtype=target_dtype
-        )
+        condition = torch.cat([condition, neg_condition], dim=0).to(device=device, dtype=dtype)
 
         speech = torch.randn(
             condition.shape[0],
             self.config.acoustic_vae_dim,
-            device=target_device,
-            dtype=target_dtype,
+            device=device,
+            dtype=dtype,   # 🔑 반드시 여기
         )
 
         for t in self.model.noise_scheduler.timesteps:
-            t = t.to(device=target_device)
-
+            t = t.to(device)
             half = speech[: len(speech) // 2]
-            combined = torch.cat([half, half], dim=0).to(
-                device=target_device, dtype=target_dtype
-            )
+            combined = torch.cat([half, half], dim=0)
 
             eps = head(
-                combined,
-                t.repeat(combined.shape[0]),
-                condition=condition,
+                combined,                       # half
+                t.repeat(combined.shape[0]),    # long/int OK
+                condition=condition             # half
             )
 
             cond_eps, uncond_eps = torch.split(eps, len(eps) // 2, dim=0)
