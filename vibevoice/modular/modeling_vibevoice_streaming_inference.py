@@ -699,7 +699,7 @@ class VibeVoiceStreamingForConditionalGenerationInference(VibeVoiceStreamingPreT
     def sample_speech_tokens(self, condition, neg_condition, cfg_scale=3.0):
         head = self.model.prediction_head
         device = head.noisy_images_proj.weight.device
-        dtype  = head.noisy_images_proj.weight.dtype  # 🔑 핵심
+        dtype  = head.noisy_images_proj.weight.dtype  # 🔑 기준
 
         self.model.noise_scheduler.set_timesteps(self.ddpm_inference_steps)
 
@@ -709,18 +709,18 @@ class VibeVoiceStreamingForConditionalGenerationInference(VibeVoiceStreamingPreT
             condition.shape[0],
             self.config.acoustic_vae_dim,
             device=device,
-            dtype=dtype,   # 🔑 반드시 여기
+            dtype=dtype,   # 🔑 float32 금지
         )
 
         for t in self.model.noise_scheduler.timesteps:
             t = t.to(device)
             half = speech[: len(speech) // 2]
-            combined = torch.cat([half, half], dim=0)
+            combined = torch.cat([half, half], dim=0).to(device=device, dtype=dtype)
 
             eps = head(
-                combined,                       # half
-                t.repeat(combined.shape[0]),    # long/int OK
-                condition=condition             # half
+                combined,
+                t.repeat(combined.shape[0]),
+                condition=condition,
             )
 
             cond_eps, uncond_eps = torch.split(eps, len(eps) // 2, dim=0)
@@ -731,7 +731,6 @@ class VibeVoiceStreamingForConditionalGenerationInference(VibeVoiceStreamingPreT
 
         return speech[: len(speech) // 2]
 
-    
 
 AutoModelForCausalLM.register(VibeVoiceStreamingConfig, VibeVoiceStreamingForConditionalGenerationInference)
 

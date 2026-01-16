@@ -260,8 +260,7 @@ class VibeVoiceDiffusionHead(PreTrainedModel):
         """
         Forward pass of the prediction head.
         """
-
-        # 🔒 dtype / device 통일 (Linear 기준)
+        # 🔒 dtype/device 통일: Linear weight 기준
         target_dtype = self.noisy_images_proj.weight.dtype
         device = self.noisy_images_proj.weight.device
 
@@ -269,25 +268,17 @@ class VibeVoiceDiffusionHead(PreTrainedModel):
         condition = condition.to(device=device, dtype=target_dtype)
         timesteps = timesteps.to(device=device)
 
-        # 1) noisy latent projection
         x = self.noisy_images_proj(noisy_images)
-
-        # 2) timestep embedding
         t = self.t_embedder(timesteps)
-
-        # 3) condition projection
         condition = self.cond_proj(condition)
-
-        # 4) combine condition + timestep
         c = condition + t
 
-        # 5) diffusion head layers
         for layer in self.layers:
             x = layer(x, c)
 
-        # 6) final projection
         x = self.final_layer(x, c)
         return x
+
 
 
 
