@@ -698,17 +698,45 @@ class VibeVoiceStreamingForConditionalGenerationInference(VibeVoiceStreamingPreT
     @torch.no_grad()
     def sample_speech_tokens(self, condition, neg_condition, cfg_scale=3.0):
         self.model.noise_scheduler.set_timesteps(self.ddpm_inference_steps)
-        condition = torch.cat([condition, neg_condition], dim=0).to(self.model.prediction_head.device)
-        speech = torch.randn(condition.shape[0], self.config.acoustic_vae_dim).to(condition)
+
+        # 🔒 기준 dtype / device를 prediction_head에 맞춤
+        head = self.model.prediction_head
+        target_dtype = head.noisy_images_proj.weight.dtype
+        target_device = head.noisy_images_proj.weight.device
+
+        condition = torch.cat([condition, neg_condition], dim=0).to(
+            device=target_device, dtype=target_dtype
+        )
+
+        speech = torch.randn(
+            condition.shape[0],
+            self.config.acoustic_vae_dim,
+            device=target_device,
+            dtype=target_dtype,
+        )
+
         for t in self.model.noise_scheduler.timesteps:
+            t = t.to(device=target_device)
+
             half = speech[: len(speech) // 2]
-            combined = torch.cat([half, half], dim=0)
-            eps = self.model.prediction_head(combined, t.repeat(combined.shape[0]).to(combined), condition=condition)
+            combined = torch.cat([half, half], dim=0).to(
+                device=target_device, dtype=target_dtype
+            )
+
+            eps = head(
+                combined,
+                t.repeat(combined.shape[0]),
+                condition=condition,
+            )
+
             cond_eps, uncond_eps = torch.split(eps, len(eps) // 2, dim=0)
             half_eps = uncond_eps + cfg_scale * (cond_eps - uncond_eps)
             eps = torch.cat([half_eps, half_eps], dim=0)
+
             speech = self.model.noise_scheduler.step(eps, t, speech).prev_sample
+
         return speech[: len(speech) // 2]
+
     
 
 AutoModelForCausalLM.register(VibeVoiceStreamingConfig, VibeVoiceStreamingForConditionalGenerationInference)
