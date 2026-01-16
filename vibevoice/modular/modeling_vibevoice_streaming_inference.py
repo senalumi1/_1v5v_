@@ -176,30 +176,27 @@ class VibeVoiceStreamingForConditionalGenerationInference(VibeVoiceStreamingPreT
         return_dict: Optional[bool] = None,
         cache_position: Optional[torch.LongTensor] = None,
         **kwargs,
-    ) -> Union[Tuple, BaseModelOutputWithPast]:
+        ) -> Union[Tuple, BaseModelOutputWithPast]:
 
         return_dict = return_dict if return_dict is not None else self.config.use_return_dict
+
+        # 🔒 Qwen2 (transformers 4.51.3) 규칙: past_key_values는 Cache 또는 None만 허용
+        past_key_values = None
 
         # 1) embeddings 생성
         if inputs_embeds is None:
             inputs_embeds = self.model.get_input_embeddings()(input_ids)
 
-        # 2) 🔒 attention 진입 전 dtype 강제 통일 (핵심)
+        # 2) 🔒 attention 진입 전 dtype 통일
         if inputs_embeds is not None:
             inputs_embeds = inputs_embeds.to(torch.float16)
 
-        if past_key_values is not None:
-            past_key_values = tuple(
-                tuple(p.to(torch.float16) if p is not None else None for p in layer)
-                for layer in past_key_values
-            )
-
-        # 3) LM forward
+        # 3) LM forward (캐시는 내부에서만 관리)
         outputs = self.model.language_model(
             inputs_embeds=inputs_embeds,
             attention_mask=attention_mask,
             position_ids=position_ids,
-            past_key_values=None,
+            past_key_values=None,   # 이중 안전
             use_cache=use_cache,
             output_attentions=output_attentions,
             output_hidden_states=output_hidden_states,
